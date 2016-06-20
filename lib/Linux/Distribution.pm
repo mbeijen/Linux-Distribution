@@ -14,6 +14,7 @@ our $VERSION = '0.23';
 
 our $release_files_directory='/etc';
 our $standard_release_file = 'lsb-release';
+our $os_release_file = 'os-release';
 
 our %release_files = (
     'gentoo-release'        => 'gentoo',
@@ -87,9 +88,8 @@ sub new {
 sub distribution_name {
     my $self = shift || new();
     my $distro;
-    if ($distro = $self->_get_lsb_info()){
-        return $distro if ($distro);
-    }
+    return $distro if ($distro = $self->_get_os_release_info());
+    return $distro if ($distro = $self->_get_lsb_info());
 
     foreach (qw(enterprise-release fedora-release CloudLinux-release)) {
         if (-f "$release_files_directory/$_" && !-l "$release_files_directory/$_"){
@@ -140,6 +140,7 @@ sub distribution_name {
 sub distribution_version {
     my $self = shift || new();
     my $release;
+    return $release if ($release = $self->_get_os_release_info('VERSION_ID'));
     return $release if ($release = $self->_get_lsb_info('DISTRIB_RELEASE'));
     if (! $self->{'DISTRIB_ID'}){
          $self->distribution_name() or die 'No version because no distro.';
@@ -163,6 +164,24 @@ sub _get_lsb_info {
             return $info
         }
     } 
+    $self->{'release_file'} = $tmp;
+    $self->{'pattern'} = '';
+    undef;
+}
+
+sub _get_os_release_info {
+    my $self = shift;
+    my $field = shift || 'NAME';
+    my $tmp = $self->{'release_file'};
+    if ( -r "$release_files_directory/" . $os_release_file ) {
+        $self->{'release_file'} = $os_release_file;
+        $self->{'pattern'} = $field . '=["]?([^"]+)["]?';
+        my $info = $self->_get_file_info();
+        if ($info){
+            $self->{$field} = $info;
+            return $info
+        }
+    }
     $self->{'release_file'} = $tmp;
     $self->{'pattern'} = '';
     undef;
@@ -214,11 +233,13 @@ Linux::Distribution - Perl extension to detect on which Linux distribution we ar
 
 =head1 DESCRIPTION
 
-This is a simple module that tries to guess on what linux distribution we are running by looking for release's files in /etc.  It now looks for 'lsb-release' first as that should be the most correct and adds ubuntu support.  Secondly, it will look for the distro specific files.
+This is a simple module that tries to guess on what linux distribution we are running by looking for release files in /etc.
+The module tries to read from 'os-release' if that is available. Alternatively, it looks for
+'lsb-release'.  After that, it will look for the distro specific files.
 
 It currently recognizes slackware, debian, suse, fedora, redhat, turbolinux, yellowdog, knoppix, mandrake, conectiva, immunix, tinysofa, va-linux, trustix, adamantix, yoper, arch-linux, libranet, gentoo, ubuntu, scientific, oracle enterprise linux, amazon linux and redflag.
 
-It has function to get the version for debian, suse, fedora, redhat, gentoo, slackware, scientific, oracle enterprise linux, amazon linux, redflag and ubuntu(lsb). People running unsupported distro's are greatly encouraged to submit patches :-)
+It has function to get the version for debian, suse, fedora, redhat, gentoo, slackware, scientific, oracle enterprise linux, amazon linux, redflag and ubuntu. People running unsupported distro's are greatly encouraged to submit patches :-)
 
 =head2 EXPORT
 
